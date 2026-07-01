@@ -58,10 +58,10 @@
         }
     </style>
 </head>
-<body class="bg-gray-950 text-gray-100 min-h-screen flex selection:bg-primary-500 selection:text-white">
+<body class="bg-gray-950 text-gray-100 min-h-screen flex flex-col md:flex-row selection:bg-primary-500 selection:text-white">
 
     <!-- Sidebar -->
-    <aside class="w-64 glass-panel border-r border-gray-800 flex flex-col h-screen fixed">
+    <aside class="w-full md:w-64 glass-panel border-b md:border-r md:border-b-0 border-gray-800 flex flex-col md:h-screen md:fixed z-40 relative">
         <div class="p-6 flex items-center gap-3">
             <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-primary-500 to-purple-600 flex items-center justify-center shadow-lg shadow-primary-500/30">
                 <i class="fa-solid fa-brain text-white text-sm"></i>
@@ -96,7 +96,7 @@
     </aside>
 
     <!-- Main Content -->
-    <main class="flex-1 ml-64 p-8">
+    <main class="flex-1 md:ml-64 p-4 md:p-8 w-full overflow-x-hidden">
         
         <!-- Header -->
         <header id="overview-section" class="flex justify-between items-center mb-10">
@@ -105,12 +105,12 @@
                 <p class="text-gray-400">Dưới đây là các phân tích mới nhất từ hệ thống AI của bạn.</p>
             </div>
             
-            <div class="flex items-center gap-4">
+            <div class="flex flex-col md:flex-row items-center gap-4 mt-4 md:mt-0">
                 <!-- Chuyên ngành & Tự học -->
-                <div class="flex items-center gap-2 bg-gray-900 border border-gray-700 rounded-full p-1 pl-3">
+                <div class="flex items-center gap-2 bg-gray-900 border border-gray-700 rounded-full p-1 pl-3 w-full md:w-auto">
                     <i class="fa-solid fa-graduation-cap text-primary-400"></i>
-                    <input type="text" id="specialty-input" placeholder="Nhập chuyên ngành (VD: Cơ khí, Tự động hóa...)" class="bg-transparent text-gray-200 text-sm outline-none w-64 px-2" value="Cơ điện tử">
-                    <button onclick="triggerAutoLearn()" id="btn-learn" class="bg-primary-600 hover:bg-primary-500 text-white text-sm font-medium px-4 py-1.5 rounded-full transition-colors">
+                    <input type="text" id="specialty-input" placeholder="Nhập chuyên ngành (VD: Cơ khí...)" class="bg-transparent text-gray-200 text-sm outline-none flex-1 md:w-64 px-2" value="Cơ điện tử">
+                    <button onclick="triggerAutoLearn()" id="btn-learn" class="bg-primary-600 hover:bg-primary-500 text-white text-sm font-medium px-4 py-1.5 rounded-full transition-colors whitespace-nowrap">
                         Bắt đầu tự học
                     </button>
                 </div>
@@ -172,9 +172,11 @@
 
                 <!-- Recent Learnings -->
                 <div id="knowledge-section">
-                    <div class="flex justify-between items-end mb-4">
-                        <h3 class="text-xl font-bold">Kho Kiến Thức Mới (Đã Dịch Tiếng Việt)</h3>
-                        <a href="#" class="text-sm text-primary-400 hover:text-primary-300">Xem tất cả</a>
+                    <div class="flex flex-wrap justify-between items-end mb-4 gap-2">
+                        <h3 class="text-xl font-bold">Kho Kiến Thức Mới (Bản Dịch Chi Tiết)</h3>
+                        <button onclick="deleteAllKnowledge()" class="text-xs bg-red-600/20 text-red-400 hover:bg-red-600/40 hover:text-red-300 border border-red-500/20 px-3 py-1.5 rounded-lg transition-colors font-medium">
+                            <i class="fa-solid fa-trash-can mr-1"></i> Xóa tất cả
+                        </button>
                     </div>
                     
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="knowledge-container">
@@ -204,7 +206,39 @@
         </div>
     </main>
 
+    <!-- Article Modal -->
+    <div id="article-modal" class="fixed inset-0 z-[100] hidden flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div class="glass-panel w-full max-w-4xl max-h-[90vh] rounded-2xl flex flex-col overflow-hidden shadow-2xl shadow-primary-500/20 border border-gray-700 bg-gray-950">
+            <div class="p-4 md:p-6 border-b border-gray-800 flex justify-between items-start gap-4">
+                <div class="flex-1">
+                    <h2 id="modal-title" class="text-xl md:text-2xl font-bold text-gray-100 mb-2">Tiêu đề bài báo</h2>
+                    <p id="modal-authors" class="text-sm text-gray-400"><i class="fa-solid fa-user-pen mr-1"></i> Tác giả</p>
+                </div>
+                <button onclick="closeModal()" class="w-8 h-8 rounded-full bg-gray-800 flex-shrink-0 flex items-center justify-center hover:bg-gray-700 text-gray-400 hover:text-white transition-colors">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+            <div class="p-4 md:p-6 overflow-y-auto flex-1 space-y-6">
+                <div class="p-4 bg-primary-900/20 rounded-xl border border-primary-500/20">
+                    <h3 class="text-sm font-semibold text-primary-400 mb-2"><i class="fa-solid fa-brain mr-1"></i> Phân Tích & Giá Trị Khoa Học (AI)</h3>
+                    <p id="modal-analysis" class="text-gray-300 leading-relaxed"></p>
+                </div>
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-200 mb-3"><i class="fa-solid fa-language mr-2"></i> Bản Dịch Toàn Văn</h3>
+                    <div id="modal-content" class="text-gray-300 leading-relaxed space-y-4 whitespace-pre-wrap"></div>
+                </div>
+            </div>
+            <div class="p-4 md:p-6 border-t border-gray-800 bg-gray-900/50 flex flex-wrap gap-4 justify-end">
+                <button onclick="closeModal()" class="px-5 py-2.5 rounded-xl border border-gray-700 text-gray-300 font-medium hover:bg-gray-800 transition-colors">Đóng</button>
+                <a id="modal-pdf-link" href="#" target="_blank" class="px-5 py-2.5 rounded-xl bg-primary-600 hover:bg-primary-500 text-white font-medium transition-colors shadow-lg shadow-primary-500/30 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-file-pdf"></i> Tải PDF / Mở Bản Gốc
+                </a>
+            </div>
+        </div>
+    </div>
+
     <script>
+        let currentArticles = [];
         // Drag and Drop functionality
         const dropzone = document.getElementById('dropzone');
         const fileInput = document.getElementById('video-input');
@@ -356,6 +390,7 @@
             try {
                 const res = await fetch('/api/knowledge');
                 const data = await res.json();
+                currentArticles = data;
                 const container = document.getElementById('knowledge-container');
                 
                 if(data.length === 0) {
@@ -364,9 +399,9 @@
                 }
 
                 container.innerHTML = '';
-                data.forEach(item => {
+                data.forEach((item, index) => {
                     container.innerHTML += `
-                        <div class="glass-panel p-5 rounded-xl hover-lift cursor-pointer group" onclick="window.open('${item.url}', '_blank')">
+                        <div class="glass-panel p-5 rounded-xl hover-lift cursor-pointer group" onclick="openModal(${index})">
                             <div class="flex items-start justify-between mb-3">
                                 <span class="px-2.5 py-1 rounded-md text-xs font-semibold bg-blue-500/20 text-blue-400 border border-blue-500/20">${item.field}</span>
                                 <span class="text-xs text-gray-500"><i class="fa-solid fa-link mr-1"></i> ${item.source}</span>
@@ -383,6 +418,32 @@
                 });
             } catch(e) {
                 console.error(e);
+            }
+        }
+
+        function openModal(index) {
+            const art = currentArticles[index];
+            document.getElementById('modal-title').innerText = art.title;
+            document.getElementById('modal-authors').innerHTML = `<i class="fa-solid fa-user-pen mr-1"></i> ${art.authors || 'Đang cập nhật'}`;
+            document.getElementById('modal-analysis').innerText = art.analysis || 'Chưa có phân tích.';
+            document.getElementById('modal-content').innerText = art.content || 'Nội dung đang trống.';
+            document.getElementById('modal-pdf-link').href = art.url;
+            document.getElementById('article-modal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('article-modal').classList.add('hidden');
+        }
+
+        async function deleteAllKnowledge() {
+            if(!confirm("Bạn có chắc chắn muốn xóa TOÀN BỘ bài báo đã học không?")) return;
+            try {
+                const res = await fetch('/api/knowledge', { method: 'DELETE' });
+                const data = await res.json();
+                alert(data.message);
+                loadKnowledge();
+            } catch(e) {
+                alert("Lỗi kết nối khi xóa.");
             }
         }
 

@@ -197,10 +197,12 @@ async def auto_learn(field: str = Form(...)):
             return {"status": "success", "message": "Không tìm thấy bài mới hoặc tất cả đã được học."}
 
         # AI Dịch thuật và Phân tích gộp
-        prompt = "Bạn là một AI Nghiên cứu Khoa học. Dưới đây là các bài báo tiếng Anh. " \
-                 "Hãy DỊCH SANG TIẾNG VIỆT toàn bộ Tiêu đề và Tóm tắt của từng bài, đồng thời viết 1 câu phân tích ngắn gọn giá trị của bài báo.\n" \
+        prompt = "Bạn là một AI Nghiên cứu Khoa học và Dịch giả chuyên nghiệp. Dưới đây là dữ liệu các bài báo tiếng Anh (Tiêu đề và Tóm tắt). " \
+                 "Yêu cầu: Hãy DỊCH CỰC KỲ CHI TIẾT VÀ ĐẦY ĐỦ toàn bộ nội dung sang tiếng Việt với văn phong học thuật. " \
+                 "Bạn phải dịch trọn vẹn từng câu, không được cắt xén hay tóm tắt ngắn đi. " \
+                 "Sau bản dịch toàn văn, hãy viết thêm 1 đoạn (2-3 câu) phân tích giá trị khoa học của bài báo này.\n" \
                  "YÊU CẦU BẮT BUỘC: Trả về ĐÚNG định dạng JSON mảng các object (không thêm text nào khác):\n" \
-                 "[\n  {\"title_vi\": \"Tiêu đề tiếng Việt\", \"content_vi\": \"Tóm tắt tiếng Việt\", \"analysis\": \"Phân tích tiếng Việt\"}\n]\n\n"
+                 "[\n  {\"title_vi\": \"Tiêu đề tiếng Việt\", \"content_vi\": \"[Bản dịch toàn văn cực kỳ chi tiết]\", \"analysis\": \"Phân tích giá trị khoa học\"}\n]\n\n"
         
         for i, art in enumerate(articles_to_analyze):
             prompt += f"--- Bài {i+1} ---\nTitle: {art['title']}\nAbstract: {art['abstract']}\n\n"
@@ -263,6 +265,16 @@ async def get_knowledge():
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+
+@app.delete("/api/knowledge")
+async def clear_knowledge():
+    try:
+        supabase = get_supabase()
+        # Delete all rows where id is not null (Supabase requires a filter for delete)
+        supabase.table('knowledge').delete().neq('id', 0).execute()
+        return {"status": "success", "message": "Đã xóa toàn bộ kiến thức cũ."}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"status": "error", "message": f"Lỗi: {str(e)}"})
 
 
 
