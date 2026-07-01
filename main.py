@@ -96,30 +96,32 @@ async def upload_video(file: UploadFile = File(...)):
 async def auto_learn(field: str = Form(...)):
     try:
         supabase = get_supabase()
-        
         import random
-        
         # Nâng cấp: Dùng AI để phân tích và mở rộng từ khóa sang các ứng dụng thực tiễn (UAV, Tự hành, Mạch nhúng...)
         field_en_prompt = f"""
 Người dùng muốn tìm kiếm nghiên cứu, đồ án về mảng: '{field}'.
 Hãy mở rộng chủ đề này thành các công nghệ, đồ án và ứng dụng thực tiễn cực kỳ hiện đại liên quan (Ví dụ: UAV, mạch nhúng, tự hành, robotics, IoT, AI application...).
-Nhiệm vụ của bạn là tạo ra MỘT chuỗi truy vấn tìm kiếm tiếng Anh chuẩn xác nhất để đưa vào API của arXiv.
-Cú pháp BẮT BUỘC: all:"keyword 1" OR all:"keyword 2" OR all:"keyword 3"
+Nhiệm vụ của bạn là tạo ra MỘT chuỗi truy vấn tìm kiếm tiếng Anh chuẩn xác nhất để đưa vào API tìm kiếm toàn cầu.
+Cú pháp BẮT BUỘC: "keyword 1" OR "keyword 2" OR "keyword 3"
 (Giới hạn khoảng 4-5 cụm từ xuất sắc nhất, bao trùm cả nền tảng lẫn ứng dụng).
-CHỈ trả về ĐÚNG chuỗi truy vấn, TUYỆT ĐỐI KHÔNG giải thích, không dùng dấu ngoặc đơn ở đầu/cuối.
+CHỈ trả về ĐÚNG chuỗi truy vấn, TUYỆT ĐỐI KHÔNG giải thích.
 """
         field_en_response = model.generate_content(field_en_prompt)
-        query_string = field_en_response.text.strip().replace('\n', '').strip('"').strip("'")
-        print(f"Expanded Query: {query_string}")
+        base_query = field_en_response.text.strip().replace('\n', '')
+        
+        # Tạo query riêng cho arXiv (thêm tiền tố all:)
+        arxiv_query = " OR ".join([f'all:{kw.strip()}' for kw in base_query.split(' OR ')])
+        print(f"Base Query (Scholar): {base_query}")
+        print(f"Arxiv Query: {arxiv_query}")
         client = arxiv.Client()
         
         # 1. Lấy 50 bài liên quan nhất và trộn ngẫu nhiên để không bị trùng lặp ở các lần bấm
-        search_relevance = arxiv.Search(query=query_string, max_results=50)
+        search_relevance = arxiv.Search(query=arxiv_query, max_results=50)
         relevance_results = list(client.results(search_relevance))
         random.shuffle(relevance_results)
         
         # 2. Lấy 50 bài mới nhất và trộn ngẫu nhiên
-        search_newest = arxiv.Search(query=query_string, max_results=50, sort_by=arxiv.SortCriterion.SubmittedDate)
+        search_newest = arxiv.Search(query=arxiv_query, max_results=50, sort_by=arxiv.SortCriterion.SubmittedDate)
         newest_results = list(client.results(search_newest))
         random.shuffle(newest_results)
 
@@ -162,7 +164,7 @@ CHỈ trả về ĐÚNG chuỗi truy vấn, TUYỆT ĐỐI KHÔNG giải thích,
         # 3. Mở rộng tìm kiếm trên Google Scholar (bỏ qua một số bài ngẫu nhiên để lấy bài mới)
         try:
             from scholarly import scholarly
-            search_scholar = scholarly.search_pubs(query_string)
+            search_scholar = scholarly.search_pubs(base_query)
             
             # Skip ngẫu nhiên 0 đến 5 bài đầu tiên để lấy bài khác nhau mỗi lần
             skip_count = random.randint(0, 5)
@@ -172,7 +174,7 @@ CHỈ trả về ĐÚNG chuỗi truy vấn, TUYỆT ĐỐI KHÔNG giải thích,
                 except StopIteration:
                     break
                     
-            for _ in range(1): # Lấy thêm 1 bài từ Google Scholar
+            for _ in range(3): # Tăng lên lấy 3 bài từ Google Scholar
                 try:
                     pub = next(search_scholar)
                     url = pub.get('pub_url', pub.get('eprint_url', ''))
@@ -240,7 +242,7 @@ CHỈ trả về ĐÚNG chuỗi truy vấn, TUYỆT ĐỐI KHÔNG giải thích,
                 "content": content_vi,
                 "analysis": analysis,
                 "url": art['url'],
-                "source": "arXiv"
+                "source": "Scholar/arXiv"
             }).execute()
             
             results_info.append({"title": title_vi, "url": art['url']})
