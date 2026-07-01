@@ -251,7 +251,10 @@ CHỈ trả về ĐÚNG chuỗi truy vấn, TUYỆT ĐỐI KHÔNG giải thích.
     except ValueError as ve:
         return JSONResponse(status_code=400, content={"status": "error", "message": str(ve)})
     except Exception as e:
-        return JSONResponse(status_code=500, content={"status": "error", "message": f"Lỗi: {str(e)}"})
+        error_msg = str(e)
+        if "429" in error_msg or "Quota" in error_msg or "exhausted" in error_msg:
+            return JSONResponse(status_code=429, content={"status": "error", "message": "Hệ thống AI đang quá tải do giới hạn của gói miễn phí (5 lượt/phút). Bạn vui lòng chờ khoảng 30 giây rồi bấm thử lại nhé!"})
+        return JSONResponse(status_code=500, content={"status": "error", "message": f"Lỗi: {error_msg}"})
 
 @app.get("/api/projects")
 async def get_projects():
