@@ -99,12 +99,18 @@ async def auto_learn(field: str = Form(...)):
         
         import random
         
-        # Dịch từ khóa tiếng Việt sang tiếng Anh vì arXiv là kho dữ liệu tiếng Anh
-        field_en_prompt = f"Dịch từ khóa chuyên ngành sau sang tiếng Anh (CHỈ trả về từ khóa tiếng Anh, không thêm dấu câu hay giải thích): {field}"
+        # Nâng cấp: Dùng AI để phân tích và mở rộng từ khóa sang các ứng dụng thực tiễn (UAV, Tự hành, Mạch nhúng...)
+        field_en_prompt = f"""
+Người dùng muốn tìm kiếm nghiên cứu, đồ án về mảng: '{field}'.
+Hãy mở rộng chủ đề này thành các công nghệ, đồ án và ứng dụng thực tiễn cực kỳ hiện đại liên quan (Ví dụ: UAV, mạch nhúng, tự hành, robotics, IoT, AI application...).
+Nhiệm vụ của bạn là tạo ra MỘT chuỗi truy vấn tìm kiếm tiếng Anh chuẩn xác nhất để đưa vào API của arXiv.
+Cú pháp BẮT BUỘC: all:"keyword 1" OR all:"keyword 2" OR all:"keyword 3"
+(Giới hạn khoảng 4-5 cụm từ xuất sắc nhất, bao trùm cả nền tảng lẫn ứng dụng).
+CHỈ trả về ĐÚNG chuỗi truy vấn, TUYỆT ĐỐI KHÔNG giải thích, không dùng dấu ngoặc đơn ở đầu/cuối.
+"""
         field_en_response = model.generate_content(field_en_prompt)
-        field_en = field_en_response.text.strip().replace('"', '')
-
-        query_string = f'all:"{field_en}"'
+        query_string = field_en_response.text.strip().replace('\n', '').strip('"').strip("'")
+        print(f"Expanded Query: {query_string}")
         client = arxiv.Client()
         
         # 1. Lấy 50 bài liên quan nhất và trộn ngẫu nhiên để không bị trùng lặp ở các lần bấm
