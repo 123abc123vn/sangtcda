@@ -339,11 +339,40 @@
         async function submitVideoLink() {
             const linkInput = document.getElementById('video-link-input').value;
             if(!linkInput) {
-                alert("Vui lòng nhập link bài báo hoặc video!");
+                alert("Vui lòng nhập link bài báo, Facebook, YouTube hoặc TikTok!");
                 return;
             }
-            alert("Đã nhận link: " + linkInput + "\n\nTính năng xử lý Link bài báo, Tin tức và Video trực tiếp qua AI đang được tinh chỉnh ở phiên bản tiếp theo. Hiện tại, vui lòng dùng tính năng Tải File (PDF/Video) hoặc Tự học.");
-            document.getElementById('video-link-input').value = "";
+            
+            const originalValue = document.getElementById('video-link-input').value;
+            document.getElementById('video-link-input').value = "Đang tải và xử lý video... (Đợi khoảng 15-30s)";
+            document.getElementById('video-link-input').disabled = true;
+            document.getElementById('video-link-input').classList.add('opacity-50', 'animate-pulse');
+
+            const formData = new FormData();
+            formData.append('link', linkInput);
+
+            try {
+                const response = await fetch('/api/process_link', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                
+                if(data.status === 'success') {
+                    alert(data.message);
+                    loadProjects(); // Cập nhật lại danh sách Đồ án
+                    document.getElementById('video-link-input').value = "";
+                } else {
+                    alert('Lỗi: ' + data.message);
+                    document.getElementById('video-link-input').value = originalValue;
+                }
+            } catch (e) {
+                alert('Lỗi kết nối máy chủ!');
+                document.getElementById('video-link-input').value = originalValue;
+            } finally {
+                document.getElementById('video-link-input').disabled = false;
+                document.getElementById('video-link-input').classList.remove('opacity-50', 'animate-pulse');
+            }
         }
 
         async function triggerAutoLearn() {

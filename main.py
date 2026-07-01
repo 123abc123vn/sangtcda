@@ -7,6 +7,9 @@ import os
 import time
 import json
 import arxiv
+import yt_dlp
+import tempfile
+import glob
 import google.generativeai as genai
 from supabase import create_client, Client
 from dotenv import load_dotenv
@@ -51,13 +54,14 @@ async def upload_video(file: UploadFile = File(...)):
     try:
         supabase = get_supabase()
         
-        file_path = f"uploads/{file.filename}"
-        with open(file_path, "wb") as buffer:
-            content = await file.read()
-            buffer.write(content)
-        
-        print(f"Uploading {file.filename} to Gemini...")
-        video_file = genai.upload_file(path=file_path)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            file_path = f"{temp_dir}/{file.filename}"
+            with open(file_path, "wb") as buffer:
+                content = await file.read()
+                buffer.write(content)
+            
+            print(f"Uploading {file.filename} to Gemini...")
+            video_file = genai.upload_file(path=file_path)
 
         while video_file.state.name == "PROCESSING":
             time.sleep(2)
@@ -84,7 +88,6 @@ async def upload_video(file: UploadFile = File(...)):
         }).execute()
         
         genai.delete_file(video_file.name)
-        os.remove(file_path) # Xóa file local sau khi xong
 
         return {"status": "success", "message": "Đã tạo đồ án và lưu lên Đám Mây!", "project": ai_data}
     except ValueError as ve:
@@ -273,6 +276,78 @@ async def get_knowledge():
         return response.data
     except Exception as e:
         return []
+
+@app.post("/api/process_link")
+async def process_link(link: str = Form(...)):
+    try:
+        supabase = get_supabase()
+        
+        # Thư mục tạm để tải video
+        with tempfile.TemporaryDirectory() as temp_dir:
+            # Tải video dung lượng thấp (không ghép audio+video để tránh lỗi thiếu ffmpeg trên Render)
+            ydl_opts = {
+                'format': 'worst[ext=mp4]/worst/best',
+                'outtmpl': f'{temp_dir}/%(id)s.%(ext)s',
+                'quiet': True,
+                'no_warnings': True,
+            }
+            
+            try:
+                with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                    info = ydl.extract_info(link, download=True)
+                    video_title = info.get('title', 'Unknown Social Media Video')
+            except Exception as e:
+                return JSONResponse(status_code=400, content={"status": "error", "message": f"Không thể lấy nội dung từ link này. Link có thể ở chế độ riêng tư, bị chặn, hoặc chưa được hỗ trợ. Chi tiết: {str(e)}"})
+            
+            # Tìm file vừa tải
+            downloaded_files = glob.glob(f"{temp_dir}/*")
+            if not downloaded_files:
+                return JSONResponse(status_code=500, content={"status": "error", "message": "Lỗi hệ thống: Không tìm thấy file đã tải về từ mạng xã hội."})
+                
+            file_path = downloaded_files[0]
+            
+            # Đẩy lên Gemini
+            try:
+                video_file = genai.upload_file(path=file_path)
+            except Exception as e:
+                return JSONResponse(status_code=500, content={"status": "error", "message": f"Lỗi tải file lên hệ thống AI: {str(e)}"})
+                
+            # Đợi file sẵn sàng trên Cloud của Google
+            import time
+            while video_file.state.name == "PROCESSING":
+                time.sleep(2)
+                video_file = genai.get_file(video_file.name)
+                
+            if video_file.state.name == "FAILED":
+                return JSONResponse(status_code=500, content={"status": "error", "message": "AI từ chối xử lý file này (file bị lỗi hoặc không thể phân tích)."})
+                
+            prompt = f"Đây là một nội dung video/âm thanh tải từ mạng xã hội (Tiêu đề gốc: {video_title}). " \
+                     "Hãy đóng vai một chuyên gia phân tích dữ liệu, xem/nghe toàn bộ nội dung và trích xuất những thông tin đắt giá nhất, điểm tóm tắt, mục đích cốt lõi của nội dung này bằng Tiếng Việt. " \
+                     "Trình bày rõ ràng, dễ đọc, mang tính học thuật hoặc tóm tắt kiến thức."
+                     
+            analysis_response = model.generate_content([video_file, prompt])
+            analysis_text = analysis_response.text.strip()
+            
+            # Xóa file trên Gemini để tiết kiệm dung lượng
+            try:
+                genai.delete_file(video_file.name)
+            except:
+                pass
+                
+            # Lưu vào Supabase projects
+            supabase.table('projects').insert({
+                "title": f"[MXH] {video_title}",
+                "summary": analysis_text,
+                "source_video": link # Lưu link gốc làm source
+            }).execute()
+            
+            return {"status": "success", "message": f"Đã phân tích xong nội dung: {video_title}"}
+            
+    except Exception as e:
+        error_msg = str(e)
+        if "429" in error_msg or "Quota" in error_msg or "exhausted" in error_msg:
+            return JSONResponse(status_code=429, content={"status": "error", "message": "Hệ thống AI đang quá tải do giới hạn gói miễn phí (5 lượt/phút). Bạn vui lòng chờ khoảng 30 giây rồi bấm thử lại nhé!"})
+        return JSONResponse(status_code=500, content={"status": "error", "message": f"Lỗi AI: {error_msg}"})
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
